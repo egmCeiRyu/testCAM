@@ -13,7 +13,6 @@
     }
     #container {
       position: relative;
-      
       width: 100vw;
       height: 100vh;
       overflow: hidden;
@@ -35,7 +34,7 @@
       padding: 6px 10px;
       font-size: 14px;
       text-align: center;
-      transform: translate(-10%, 0%);
+      transform: translate(-50%, -120%);
       pointer-events: none;
       min-width: 120px;
     }
@@ -83,7 +82,7 @@
         });
 
         faceMesh.setOptions({
-          maxNumFaces: 1,
+          maxNumFaces: 5,
           minDetectionConfidence: 0.5,
           minTrackingConfidence: 0.5,
         });
@@ -96,7 +95,7 @@
           results.multiFaceLandmarks.forEach((lm, i) => {
             const nose = lm[1]; // landmark near face center
             const x = nose.x * window.innerWidth;
-            const y = nose.y * window.innerHeight - 180;
+            const y = nose.y * window.innerHeight - 80;
 
             const div = document.createElement("div");
             div.className = "balloon";
