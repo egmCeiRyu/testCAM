@@ -1,57 +1,49 @@
-// server.js
 import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import { Client } from "@notionhq/client";
-
-dotenv.config();
+import fetch from "node-fetch";
 
 const app = express();
-app.use(cors());
+const PORT = process.env.PORT || 3000;
+
+const NOTION_TOKEN = process.env.NOTION_TOKEN;
+const DATABASE_ID = process.env.NOTION_DATABASE_ID;
+
+// Serve static files (frontend)
 app.use(express.static("public"));
 
-const PORT = process.env.PORT || 3000;
-const NOTION_TOKEN = process.env.NOTION_TOKEN;
-const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
-
-if (!NOTION_TOKEN || !NOTION_DATABASE_ID) {
-  console.warn("WARNING: NOTION_TOKEN or NOTION_DATABASE_ID missing. Use .env to set them.");
-}
-
-const notion = new Client({ auth: NOTION_TOKEN });
-
-// Helper: convert Notion page to simple object
-function parseNotionPage(page) {
-  const props = page.properties || {};
-  const personName = (props.PersonName?.title?.[0]?.plain_text) || (props.Name?.title?.[0]?.plain_text) || "Unknown";
-  const task = (props.Task?.rich_text?.[0]?.plain_text) || (props.Description?.rich_text?.[0]?.plain_text) || "";
-  const status = (props.Status?.select?.name) || "";
-  return {
-    id: page.id,
-    name: personName,
-    task,
-    status
-  };
-}
-
 app.get("/tasks", async (req, res) => {
-  try {
-    if (!NOTION_TOKEN || !NOTION_DATABASE_ID) {
-      return res.json({ error: "Notion token or DB not configured", items: [] });
-    }
-    const response = await notion.databases.query({
-      database_id: NOTION_DATABASE_ID,
-      page_size: 100
-    });
+  // If Notion info not provided → return mock tasks
+  if (!NOTION_TOKEN || !DATABASE_ID) {
+    return res.json([
+      { id: "1", name: "Alice", task: "Design homepage", status: "In Progress" },
+      { id: "2", name: "Bob", task: "Fix login bug", status: "Todo" },
+      { id: "3", name: "Clara", task: "Write docs", status: "Done" },
+      { id: "4", name: "David", task: "Review pull request", status: "In Review" },
+      { id: "5", name: "Eve", task: "Prepare presentation", status: "Todo" }
+    ]);
+  }
 
-    const items = (response.results || []).map(parseNotionPage);
-    res.json({ items, timestamp: Date.now() });
+  // Otherwise, fetch from Notion
+  try {
+    const r = await fetch(`https://api.notion.com/v1/databases/${DATABASE_ID}/query`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${NOTION_TOKEN}`,
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28"
+      }
+    });
+    const data = await r.json();
+    const items = data.results.map(page => ({
+      id: page.id,
+      name: page.properties.PersonName?.title[0]?.plain_text || "Unknown",
+      task: page.properties.Task?.rich_text[0]?.plain_text || "",
+      status: page.properties.Status?.select?.name || ""
+    }));
+    res.json(items);
   } catch (err) {
-    console.error("Notion fetch error:", err.message || err);
-    res.status(500).json({ error: "Failed to fetch Notion", details: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch from Notion" });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server started on http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
