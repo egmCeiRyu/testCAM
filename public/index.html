@@ -1,31 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Head Tracker + Tasks (Mock Mode)</title>
+  <meta charset="UTF-8" />
+  <title>Head Tracker + Task Balloons</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #000; color: white; }
-    #container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      color: white;
+      font-family: sans-serif;
+    }
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
     #video {
+      position: absolute;
+      top: 0;
+      left: 0;
       width: 100vw;
       height: 100vh;
       object-fit: cover;
-      position: absolute;
-      top: 0; left: 0;
       z-index: 0;
     }
     .balloon {
       position: absolute;
-      background: rgba(255,255,255,0.9);
+      background: rgba(255, 255, 255, 0.9);
       color: #000;
       border-radius: 12px;
       padding: 6px 10px;
-      font-family: sans-serif;
       font-size: 14px;
+      text-align: center;
       transform: translate(-50%, -120%);
       pointer-events: none;
-      min-width: 140px;
-      text-align: center;
+      min-width: 120px;
     }
     #startBtn {
       position: absolute;
@@ -49,84 +60,67 @@
     <button id="startBtn">🎥 Start Camera</button>
   </div>
 
-  <script type="module">
-    import { FaceMesh } from "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh";
-    import { Camera } from "https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils";
-
+  <!-- ✅ Use UMD (non-module) versions -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script>
     const video = document.getElementById("video");
     const container = document.getElementById("container");
     const startBtn = document.getElementById("startBtn");
 
-    async function getTasks() {
-      try {
-        const res = await fetch("/tasks");
-        return await res.json();
-      } catch (e) {
-        console.warn("⚠️ Could not load /tasks, using mock data.");
-        return [
-          { name: "Alice", task: "Design homepage", status: "In Progress" },
-          { name: "Bob", task: "Fix login bug", status: "Todo" },
-          { name: "Clara", task: "Write docs", status: "Done" },
-          { name: "David", task: "Review pull request", status: "In Review" },
-          { name: "Eve", task: "Prepare presentation", status: "Todo" }
-        ];
-      }
-    }
-
-    let tasks = [];
-
     startBtn.onclick = async () => {
-      startBtn.remove();
       try {
+        // 🔹 Start camera on user click
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
-        tasks = await getTasks();
-        startTracking();
+        startBtn.remove();
+
+        // 🔹 Initialize FaceMesh
+        const faceMesh = new FaceMesh.FaceMesh({
+          locateFile: (file) =>
+            `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+        });
+
+        faceMesh.setOptions({
+          maxNumFaces: 5,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+        });
+
+        // 🔹 On results — draw balloons
+        faceMesh.onResults((results) => {
+          container.querySelectorAll(".balloon").forEach((b) => b.remove());
+          if (!results.multiFaceLandmarks) return;
+
+          results.multiFaceLandmarks.forEach((lm, i) => {
+            const nose = lm[1]; // landmark near face center
+            const x = nose.x * window.innerWidth;
+            const y = nose.y * window.innerHeight - 80;
+
+            const div = document.createElement("div");
+            div.className = "balloon";
+            div.innerHTML = `<strong>Person ${i + 1}</strong><br>Task info`;
+            div.style.left = `${x}px`;
+            div.style.top = `${y}px`;
+            container.appendChild(div);
+          });
+        });
+
+        // 🔹 Start camera + send frames to FaceMesh
+        const camera = new Camera(video, {
+          onFrame: async () => {
+            await faceMesh.send({ image: video });
+          },
+          width: 1280,
+          height: 720,
+        });
+
+        camera.start();
       } catch (err) {
-        alert("Camera access denied or unavailable: " + err.message);
-        console.error(err);
+        alert("Camera error: " + err.message);
+        console.error("Camera error:", err);
       }
     };
-
-    function startTracking() {
-      const faceMesh = new FaceMesh({
-        locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-      });
-      faceMesh.setOptions({
-        maxNumFaces: 5,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-      });
-
-      faceMesh.onResults(results => {
-        container.querySelectorAll(".balloon").forEach(b => b.remove());
-        if (!results.multiFaceLandmarks) return;
-
-        results.multiFaceLandmarks.forEach((lm, i) => {
-          const nose = lm[1]; // near face center
-          const x = nose.x * window.innerWidth;
-          const y = nose.y * window.innerHeight - 80;
-
-          const div = document.createElement("div");
-          div.className = "balloon";
-
-          const person = tasks[i % tasks.length];
-          div.innerHTML = `<strong>${person.name}</strong><br>${person.task}<br><em>${person.status}</em>`;
-
-          div.style.left = `${x}px`;
-          div.style.top = `${y}px`;
-
-          container.appendChild(div);
-        });
-      });
-
-      const camera = new Camera(video, {
-        onFrame: async () => { await faceMesh.send({ image: video }); },
-        width: 1280,
-        height: 720
-      });
-      camera.start();
-    }
   </script>
 </body>
 </html>
