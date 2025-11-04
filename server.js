@@ -45,4 +45,6 @@ app.get("/tasks", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+app.listen(process.env.PORT || 3000, () =>
+  console.log("✅ Server running")
+);
