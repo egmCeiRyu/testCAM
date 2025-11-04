@@ -95,7 +95,7 @@
           results.multiFaceLandmarks.forEach((lm, i) => {
             const nose = lm[1]; // landmark near face center
             const x = nose.x * window.innerWidth;
-            const y = nose.y * window.innerHeight - 180;
+            const y = nose.y * window.innerHeight - 280;
 
             const div = document.createElement("div");
             div.className = "balloon";
