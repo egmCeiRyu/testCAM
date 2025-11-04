@@ -93,13 +93,13 @@
           if (!results.multiFaceLandmarks) return;
 
           results.multiFaceLandmarks.forEach((lm, i) => {
-            const nose = lm[120]; // landmark near face center
+            const nose = lm[200]; // landmark near face center
             const x = nose.x * window.innerWidth;
             const y = nose.y * window.innerHeight - 280;
 
             const div = document.createElement("div");
             div.className = "balloon";
-            div.innerHTML = `<strong>Person ${i + 1}</strong><br>Task info<BR><BR>Task2`;
+            div.innerHTML = `<strong>Person ${i + 1}</strong><br>Task info`;
             div.style.left = `${x}px`;
             div.style.top = `${y}px`;
             container.appendChild(div);
