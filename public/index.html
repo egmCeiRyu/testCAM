@@ -13,7 +13,7 @@
     }
     #container {
       position: relative;
-      transform: translate(-10%, 0%);
+      
       width: 100vw;
       height: 100vh;
       overflow: hidden;
@@ -93,23 +93,19 @@
           container.querySelectorAll(".balloon").forEach((b) => b.remove());
           if (!results.multiFaceLandmarks) return;
 
-          faceMesh.onResults((results) => {
-            container.querySelectorAll(".balloon").forEach((b) => b.remove());
-            if (!results.multiFaceLandmarks) return;
+          results.multiFaceLandmarks.forEach((lm, i) => {
+            const nose = lm[1]; // landmark near face center
+            const x = nose.x * window.innerWidth;
+            const y = nose.y * window.innerHeight - 180;
 
-            results.multiFaceLandmarks.forEach((lm, i) => {
-              const topHead = lm[10]; // near forehead
-              const x = topHead.x * window.innerWidth;
-              const y = topHead.y * window.innerHeight - 150; // move above head
-
-              const div = document.createElement("div");
-              div.className = "balloon";
-              div.innerHTML = `<strong>Person ${i + 1}</strong><br>Task info`;
-              div.style.left = `${x}px`;
-              div.style.top = `${y}px`;
-              container.appendChild(div);
-            });
+            const div = document.createElement("div");
+            div.className = "balloon";
+            div.innerHTML = `<strong>Person ${i + 1}</strong><br>Task info`;
+            div.style.left = `${x}px`;
+            div.style.top = `${y}px`;
+            container.appendChild(div);
           });
+        });
 
         // 🔹 Start camera + send frames to FaceMesh
         const camera = new Camera(video, {
