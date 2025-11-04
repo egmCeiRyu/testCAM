@@ -3,26 +3,25 @@ import fetch from "node-fetch";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
 const DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
-// Serve static files (frontend)
+// Serve frontend files
 app.use(express.static("public"));
 
 app.get("/tasks", async (req, res) => {
-  // If Notion info not provided → return mock tasks
+  // Mock mode if Notion info is missing
   if (!NOTION_TOKEN || !DATABASE_ID) {
+    console.log("🧩 No Notion credentials found — using mock task data.");
     return res.json([
       { id: "1", name: "Alice", task: "Design homepage", status: "In Progress" },
       { id: "2", name: "Bob", task: "Fix login bug", status: "Todo" },
       { id: "3", name: "Clara", task: "Write docs", status: "Done" },
-      { id: "4", name: "David", task: "Review pull request", status: "In Review" },
+      { id: "4", name: "David", task: "Review PR", status: "In Review" },
       { id: "5", name: "Eve", task: "Prepare presentation", status: "Todo" }
     ]);
   }
 
-  // Otherwise, fetch from Notion
   try {
     const r = await fetch(`https://api.notion.com/v1/databases/${DATABASE_ID}/query`, {
       method: "POST",
@@ -41,8 +40,8 @@ app.get("/tasks", async (req, res) => {
     }));
     res.json(items);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch from Notion" });
+    console.error("❌ Notion fetch failed:", err);
+    res.status(500).json({ error: "Failed to fetch tasks" });
   }
 });
 
