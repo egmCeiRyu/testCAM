@@ -93,7 +93,7 @@
           if (!results.multiFaceLandmarks) return;
 
           results.multiFaceLandmarks.forEach((lm, i) => {
-            const nose = lm[80]; // landmark near face center
+            const nose = lm[120]; // landmark near face center
             const x = nose.x * window.innerWidth;
             const y = nose.y * window.innerHeight - 280;
 
