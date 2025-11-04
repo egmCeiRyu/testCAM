@@ -1,140 +1,132 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
-  <title>Head Tracker + Notion Tasks (Demo)</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <title>Head Tracker + Tasks (Mock Mode)</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; color: white; }
+    #container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+    #video {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      position: absolute;
+      top: 0; left: 0;
+      z-index: 0;
+    }
+    .balloon {
+      position: absolute;
+      background: rgba(255,255,255,0.9);
+      color: #000;
+      border-radius: 12px;
+      padding: 6px 10px;
+      font-family: sans-serif;
+      font-size: 14px;
+      transform: translate(-50%, -120%);
+      pointer-events: none;
+      min-width: 140px;
+      text-align: center;
+    }
+    #startBtn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 12px 24px;
+      font-size: 16px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      z-index: 10;
+    }
+  </style>
 </head>
 <body>
-  <div id="app">
+  <div id="container">
     <video id="video" autoplay playsinline muted></video>
-    <div id="overlay"></div>
-    <div id="controls">
-      <button id="btnStart">Start Camera</button>
-      <label>Max faces:
-        <select id="maxFaces">
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5" selected>5</option>
-        </select>
-      </label>
-      <span id="status">Idle</span>
-    </div>
+    <button id="startBtn">🎥 Start Camera</button>
   </div>
 
   <script type="module">
-    import { FaceMesh } from "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js";
-    import { Camera } from "https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js";
+    import { FaceMesh } from "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh";
+    import { Camera } from "https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils";
 
     const video = document.getElementById("video");
-    const overlay = document.getElementById("overlay");
-    const btnStart = document.getElementById("btnStart");
-    const statusText = document.getElementById("status");
-    const maxFacesSelect = document.getElementById("maxFaces");
+    const container = document.getElementById("container");
+    const startBtn = document.getElementById("startBtn");
 
-    let camera;
-    let faceMesh;
-    let tasks = [];
-    let pollingInterval = 3000; // ms
-
-    async function fetchTasks() {
+    async function getTasks() {
       try {
         const res = await fetch("/tasks");
-        const json = await res.json();
-        tasks = (json.items || []);
+        return await res.json();
       } catch (e) {
-        console.warn("Failed to load tasks:", e);
+        console.warn("⚠️ Could not load /tasks, using mock data.");
+        return [
+          { name: "Alice", task: "Design homepage", status: "In Progress" },
+          { name: "Bob", task: "Fix login bug", status: "Todo" },
+          { name: "Clara", task: "Write docs", status: "Done" },
+          { name: "David", task: "Review pull request", status: "In Review" },
+          { name: "Eve", task: "Prepare presentation", status: "Todo" }
+        ];
       }
     }
 
-    // initial load
-    fetchTasks();
-    setInterval(fetchTasks, pollingInterval);
+    let tasks = [];
 
-    function clearBalloons() {
-      overlay.innerHTML = "";
-    }
-
-    function createBalloon(xPx, yPx, text, id) {
-      const el = document.createElement("div");
-      el.className = "balloon";
-      el.style.left = `${xPx}px`;
-      el.style.top = `${yPx}px`;
-      el.innerHTML = `<strong>${text.name}</strong><div class="task">${text.task}</div><div class="status">${text.status}</div>`;
-      el.dataset.personIndex = id;
-      overlay.appendChild(el);
-    }
-
-    function onResults(results) {
-      overlay.innerHTML = ""; // clear and redraw
-      const faces = results.multiFaceLandmarks || [];
-      const maxFaces = Math.min(parseInt(maxFacesSelect.value || "5", 10), 5);
-      const count = Math.min(faces.length, maxFaces);
-
-      for (let i = 0; i < count; i++) {
-        const lm = faces[i];
-        // landmark 1 is near nose tip - use as head center
-        const nose = lm[1];
-        // video might be mirrored depending on camera; use bounding calculations from video size
-        const vw = video.videoWidth || video.clientWidth;
-        const vh = video.videoHeight || video.clientHeight;
-
-        // MediaPipe x,y are normalized [0..1] based on the input image. Map to page coords.
-        const x = nose.x * vw;
-        const y = nose.y * vh;
-
-        // get corresponding Notion person data by index (simple mapping)
-        const person = tasks[i % (tasks.length || 1)] || { name: "No data", task: "", status: "" };
-
-        // translate video coords to overlay (video may be scaled to CSS size)
-        // compute bounding rect to map video pixels to page pixels
-        const rect = video.getBoundingClientRect();
-        const scaleX = rect.width / vw;
-        const scaleY = rect.height / vh;
-        const pageX = rect.left + x * scaleX;
-        const pageY = rect.top + y * scaleY - 70; // offset above head
-
-        createBalloon(pageX, pageY, person, i);
+    startBtn.onclick = async () => {
+      startBtn.remove();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        tasks = await getTasks();
+        startTracking();
+      } catch (err) {
+        alert("Camera access denied or unavailable: " + err.message);
+        console.error(err);
       }
+    };
 
-      statusText.textContent = `Faces: ${faces.length} | Tasks: ${tasks.length}`;
-    }
-
-    btnStart.addEventListener("click", async () => {
-      btnStart.disabled = true;
-      statusText.textContent = "Requesting camera…";
-      faceMesh = new FaceMesh({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+    function startTracking() {
+      const faceMesh = new FaceMesh({
+        locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
       });
-
       faceMesh.setOptions({
-        maxNumFaces: parseInt(maxFacesSelect.value || "5", 10),
-        refineLandmarks: true,
+        maxNumFaces: 5,
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5
       });
 
-      faceMesh.onResults(onResults);
+      faceMesh.onResults(results => {
+        container.querySelectorAll(".balloon").forEach(b => b.remove());
+        if (!results.multiFaceLandmarks) return;
 
-      camera = new Camera(video, {
-        onFrame: async () => {
-          await faceMesh.send({ image: video });
-        },
+        results.multiFaceLandmarks.forEach((lm, i) => {
+          const nose = lm[1]; // near face center
+          const x = nose.x * window.innerWidth;
+          const y = nose.y * window.innerHeight - 80;
+
+          const div = document.createElement("div");
+          div.className = "balloon";
+
+          const person = tasks[i % tasks.length];
+          div.innerHTML = `<strong>${person.name}</strong><br>${person.task}<br><em>${person.status}</em>`;
+
+          div.style.left = `${x}px`;
+          div.style.top = `${y}px`;
+
+          container.appendChild(div);
+        });
+      });
+
+      const camera = new Camera(video, {
+        onFrame: async () => { await faceMesh.send({ image: video }); },
         width: 1280,
         height: 720
       });
-
-      try {
-        await camera.start();
-        statusText.textContent = "Camera running";
-      } catch (e) {
-        console.error(e);
-        statusText.textContent = "Camera error";
-      }
-    });
+      camera.start();
+    }
   </script>
 </body>
 </html>
